@@ -1,16 +1,18 @@
 import os
+import schedule
+import asyncio
+
 from typing import Final
 from dotenv import load_dotenv
 from discord import Intents, Client, Message
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-import schedule
-import asyncio
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.sql import text
 from datetime import datetime
+from database.connection import SessionLocal
 
 load_dotenv()
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
-CHANNEL_ID: Final[int] = int(os.getenv('DISCORD_CHANNEL_ID'))
+CHANNEL_ID: Final[int] = int(os.getenv('CHANNEL_ID'))
 
 DB_URL: Final[str] = os.getenv('DATABASE_URL')
 
@@ -18,38 +20,59 @@ intents: Intents = Intents.default()
 intents.message_content = True
 client: Client = Client(intents=intents)
 
-engine = create_engine(DB_URL)
-Session = sessionmaker(bind=engine)
-session = Session()
+session = SessionLocal()
 
-def get_analyst_performance():
+def get_analyst_performance(analyst_name=None):
     try:
-        # Query para obter os dados do dia atual
-        query = text("""
-        SELECT analyst, 
-               COUNT(*) AS total_atendimentos,
-               SUM(CASE WHEN type = '3' THEN 1 ELSE 0 END) AS total_avaliados,
-               SUM(CASE WHEN type = '3' AND value >= 7 THEN 1 ELSE 0 END) AS total_satisfacao
-        FROM ticket_data
-        WHERE DATE(createdDate) = CURRENT_DATE
-        GROUP BY analyst
-        ORDER BY total_avaliados DESC, total_satisfacao DESC, total_atendimentos DESC;
-        """)
-        
-        result = session.execute(query)
+        if analyst_name:
+            query = text("""
+                SELECT analyst, 
+                    COUNT(*) AS total_atendimentos,
+                    SUM(CASE WHEN type = '3' THEN 1 ELSE 0 END) AS total_avaliados,
+                    SUM(CASE WHEN type = '3' AND value ~ '^[0-9]+$' AND CAST(value AS INTEGER) >= 7 THEN 1 ELSE 0 END) AS total_satisfacao
+                FROM tickets_data
+                WHERE DATE("createdDate") = CURRENT_DATE
+                AND analyst = :analyst_name
+                GROUP BY analyst 
+                ORDER BY total_avaliados DESC, total_satisfacao DESC, total_atendimentos DESC;
+            """)
+            params = {"analyst_name": analyst_name}
+        else:
+            query = text("""
+                SELECT analyst, 
+                    COUNT(*) AS total_atendimentos,
+                    SUM(CASE WHEN type = '3' THEN 1 ELSE 0 END) AS total_avaliados,
+                    SUM(CASE WHEN type = '3' AND value ~ '^[0-9]+$' AND CAST(value AS INTEGER) >= 7 THEN 1 ELSE 0 END) AS total_satisfacao
+                FROM tickets_data
+                WHERE DATE("createdDate") = CURRENT_DATE
+                GROUP BY analyst 
+                ORDER BY total_avaliados DESC, total_satisfacao DESC, total_atendimentos DESC;
+            """)
+            params = {}
+            
+        result = session.execute(query, params)
         rows = result.fetchall()
 
         if not rows:
             return "Nenhum atendimento realizado hoje."
 
-        rankings = []
-        for i, row in enumerate(rows, 1):
-            analyst, total_atendimentos, total_avaliados, total_satisfacao = row
-            rankings.append(f"{i}º {analyst} - Total: {total_atendimentos}, Avaliados: {total_avaliados}, Satisfação: {total_satisfacao}")
+        if analyst_name:
+            row = rows[0]
+            total_atendimentos, total_avaliados, total_satisfacao = row[1], row[2], row[3]
+            conversao = (total_avaliados / total_atendimentos) * 100 if total_atendimentos > 0 else 0
+            return (f"**Desempenho de {analyst_name} - {datetime.now().strftime('%d/%m/%Y')}**\n"
+                    f"Número de atendimentos: {total_atendimentos}\n"
+                    f"Conversão: {conversao:.2f}%\n"
+                    f"Satisfação: {total_satisfacao}")
+        else:
+            rankings = []
+            for i, row in enumerate(rows, 1):
+                analyst, total_atendimentos, total_avaliados, total_satisfacao = row
+                rankings.append(f"### {i}º {analyst}: \n - Total de Atendimentos: {total_atendimentos} \n- Conversão: {total_avaliados} \n- Satisfação: {total_satisfacao} \n")
+            return "\n".join(rankings)
 
-        return "\n".join(rankings)
-
-    except Exception as e:
+    except SQLAlchemyError as e:
+        session.rollback() 
         return f"Erro ao acessar o banco de dados: {e}"
 
 async def send_daily_report():
@@ -66,7 +89,7 @@ def schedule_task():
     loop = asyncio.get_event_loop()
     loop.create_task(send_daily_report())
 
-schedule.every().day.at("18:00").do(schedule_task)
+schedule.every().day.at("17:58").do(schedule_task)
 
 async def scheduler():
     while True:
@@ -77,5 +100,22 @@ async def scheduler():
 async def on_ready():
     print(f'Bot conectado como {client.user}')
     client.loop.create_task(scheduler())
+
+@client.event
+async def on_message(message: Message):
+    if message.author == client.user:
+        return
+    
+    if message.content.startswith('$cambio'):
+        await message.channel.send("O bot está funcionando corretamente!")
+
+    elif message.content.startswith('$desempenho'):
+        analyst_name = message.author.display_name
+        performance = get_analyst_performance(analyst_name)
+        await message.channel.send(performance)
+
+    elif message.content.startswith('$progresso'):
+        performance_report = get_analyst_performance()
+        await message.channel.send(f"**Progresso dos Analistas - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}**\n{performance_report}")
 
 client.run(TOKEN)
