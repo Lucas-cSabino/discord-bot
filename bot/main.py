@@ -2,7 +2,7 @@ import os
 import schedule
 import asyncio
 
-from typing import Final
+from typing import Final, Dict
 from dotenv import load_dotenv
 from discord import Intents, Client, Message
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,6 +21,20 @@ intents.message_content = True
 client: Client = Client(intents=intents)
 
 session = SessionLocal()
+
+def remove(Analyst : str) -> str:
+    return Analyst.replace(" ", "")
+    
+
+analyst_emojis: Dict[str, str] = {
+    "Ronald Lopes": "<:RonaldLopes:123456789012345678>",
+    "Paulo Rodrigues": "<:PauloRodrigues:1278062823309840434>",
+    "Luis Souza": "<:LuisSouza:1278062820688265350>",
+    "Rodolfo Joaquim": "<:RodolfoJoaquim:1278062824840626207>",
+    "Lucas Sabino": "<:LucasSabino:1278067446770565281>",
+    "Francisco Netto": "<:FranciscoNetto:1278062818658353224>",
+    "Adriel Sousa" : "<:AdrielSousa:1278074880604110938>"
+}
 
 def get_analyst_performance(analyst_name=None):
     try:
@@ -62,13 +76,19 @@ def get_analyst_performance(analyst_name=None):
             conversao = (total_avaliados / total_atendimentos) * 100 if total_atendimentos > 0 else 0
             return (f"**Desempenho de {analyst_name} - {datetime.now().strftime('%d/%m/%Y')}**\n"
                     f"Número de atendimentos: {total_atendimentos}\n"
-                    f"Conversão: {conversao:.2f}%\n"
+                    f"Conversão: {conversao:.2f}% ({total_avaliados}) \n"
                     f"Satisfação: {total_satisfacao}")
         else:
             rankings = []
             for i, row in enumerate(rows, 1):
                 analyst, total_atendimentos, total_avaliados, total_satisfacao = row
-                rankings.append(f"### {i}º {analyst}: \n - Total de Atendimentos: {total_atendimentos} \n- Conversão: {total_avaliados} \n- Satisfação: {total_satisfacao} \n")
+                conversao = (total_avaliados / total_atendimentos) * 100 if total_atendimentos > 0 else 0
+                emoji = analyst_emojis.get(analyst, "")
+                rankings.append(f"""### {emoji} {i}º {analyst}: 
+                                > Total de Atendimentos: {total_atendimentos} 
+                                > Conversão: {conversao:.1f}% 
+                                > Satisfação: {total_satisfacao} 
+                                """)
             return "\n".join(rankings)
 
     except SQLAlchemyError as e:
