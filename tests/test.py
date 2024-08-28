@@ -7,7 +7,7 @@ import datetime
 
 from typing import Final, Dict
 from dotenv import load_dotenv
-from discord import Intents, Message, Activity, ActivityType
+from discord import Intents, Activity, ActivityType
 from discord.ext import commands, tasks
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
