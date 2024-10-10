@@ -373,8 +373,8 @@ async def on_ready():
     bot.loop.create_task(mensagem_de_bom_dia_agendada())
     bot.loop.create_task(mensagem_de_boa_noite_agendada())
     bot.loop.create_task(mensagem_de_fim_expediente_agendada())
-    await register_commands() 
-    alterar_status.start()    
+    await register_commands()  # Registre comandos quando o bot estiver pronto
+    alterar_status.start()    # Inicie a tarefa de alteração de status
     asyncio.create_task(check_email())
 
 
@@ -394,14 +394,18 @@ async def on_member_join(member):
 async def register_commands():
     app_commands = bot.tree
 
+    # Defina o comando global
     app_commands.add_command(discord.app_commands.Command(
         name="hello",
         description="Responde com 'Olá!'",
         callback=hello
     ))
 
+    # Sincronize os comandos com o Discord
     await bot.tree.sync()
 
+
+# Função do comando global
 async def hello(interaction: discord.Interaction):
     await interaction.response.send_message('Olá!')
 
@@ -444,96 +448,83 @@ async def alterar_status():
 ########################################################################################
 
 
+# Enviar mensagem de bom dia e lembrete de tickets
+@tasks.loop(hours=24)
 async def enviar_bom_dia_e_lembrete_tickets():
-    channel = bot.get_channel(CHANNEL_ID)
+    now = datetime.datetime.now(local_tz)
+    if now.weekday() < 6 and now.hour == 8:
+        channel = bot.get_channel(CHANNEL_ID)
 
-    # Criação do embed unificado
-    embed_mensagem = discord.Embed(
-        title="☀️ Bom dia e Atualização de Tickets",
-        description="Lembrem-se de bater o ponto, a Camila agradece 😘",
-        color=discord.Color.green(),
-    )
-
-    # Adicionando a frase motivacional
-    frase_motivacional = random.choice(mensagens_motivacionais)
-    embed_mensagem.add_field(
-        name="📜 Frase do Dia",
-        value=frase_motivacional,
-        inline=False
-    )
-
-    # Consulta para buscar tickets em aberto por analista
-    query = text(
-        """
-        SELECT analyst, COUNT(ticket_id) AS ticket_count
-        FROM tickets_data
-        WHERE status = 'Em atendimento'
-        GROUP BY analyst;
-    """
-    )
-
-    tickets_abertos = session.execute(query).fetchall()
-
-    mensagem_tickets = random.choice(mensagens_tickets)
-
-    embed_mensagem.add_field(
-        name=' ',
-        value=mensagem_tickets,
-        inline=False
-    )
-
-    # Adicionando o lembrete de tickets ao embed
-    if tickets_abertos:
-        for row in tickets_abertos:
-            analyst, ticket_count = row.analyst, row.ticket_count
-            emoji = analyst_emojis.get(analyst, "")
-            embed_mensagem.add_field(
-                name=f"{emoji} - {analyst}",
-                value=f"> {ticket_count} tickets em aberto.",
-                inline=False
-            )
-    else:
-        embed_mensagem.add_field(
-            name="🎫 Tickets em Aberto",
-            value="Nenhum ticket em aberto no momento.",
-            inline=False
+        embed_mensagem = discord.Embed(
+            title="☀️ Bom dia e Atualização de Tickets",
+            description="Lembrem-se de bater o ponto, a Camila agradece 😘",
+            color=discord.Color.green(),
         )
 
-    # Envia o embed com a mensagem de bom dia e lembrete de tickets
-    await channel.send(embed=embed_mensagem)
-    print("Mensagem de bom dia e lembrete de tickets em aberto enviados com sucesso!")
+        frase_motivacional = random.choice(mensagens_motivacionais)
+        embed_mensagem.add_field(name="📜 Frase do Dia", value=frase_motivacional, inline=False)
+
+        query = text("""
+            SELECT analyst, COUNT(ticket_id) AS ticket_count
+            FROM tickets_data
+            WHERE status = 'Em atendimento'
+            GROUP BY analyst;
+        """)
+
+        tickets_abertos = session.execute(query).fetchall()
+
+        mensagem_tickets = random.choice(mensagens_tickets)
+        embed_mensagem.add_field(name=' ', value=mensagem_tickets, inline=False)
+
+        if tickets_abertos:
+            for row in tickets_abertos:
+                analyst, ticket_count = row.analyst, row.ticket_count
+                emoji = analyst_emojis.get(analyst, "")
+                embed_mensagem.add_field(
+                    name=f"{emoji} - {analyst}",
+                    value=f"> {ticket_count} tickets em aberto.",
+                    inline=False
+                )
+        else:
+            embed_mensagem.add_field(
+                name="🎫 Tickets em Aberto",
+                value="Nenhum ticket em aberto no momento.",
+                inline=False
+            )
+
+        await channel.send(embed=embed_mensagem)
+        print("Mensagem de bom dia e lembrete de tickets em aberto enviados com sucesso!")
 
 
+
+@tasks.loop(hours=24)
 async def enviar_mensagem_de_boa_noite():
-    channel = bot.get_channel(CHANNEL_ID)
-    mensagem_aleatoria_boa_noite = random.choice(mensagens_boa_noite)
+    now = datetime.datetime.now(local_tz)
+    if now.weekday() <= 4 and now.hour == 8:
+        channel = bot.get_channel(CHANNEL_ID)
+        mensagem_aleatoria_boa_noite = random.choice(mensagens_boa_noite)
 
-    embed_boa_noite = discord.Embed(
-        title=mensagem_aleatoria_boa_noite,
-        color=discord.Color.dark_blue()
-    )
+        embed_boa_noite = discord.Embed(
+            title=mensagem_aleatoria_boa_noite,
+            color=discord.Color.dark_blue()
+        )
 
-    embed_boa_noite.add_file(
-        name="Boa noite a todos!",
-        value=mensagem_aleatoria_boa_noite,
-        inline=False
-    )
-
-    embed_boa_noite.set_footer(
-        text="Ah, não vão esquecer de bater o ponto! 👋"
-    )
-    await channel.send("@everyone", embed=embed_boa_noite)
+        embed_boa_noite.set_footer(text="Ah, não vão esquecer de bater o ponto! 👋")
+        await channel.send("@everyone", embed=embed_boa_noite)
 
 
+@tasks.loop(hours=24)
 async def enviar_mensagem_de_fim_expediente():
-    channel = bot.get_channel(CHANNEL_ID)
-    mensagem_aleatoria_fim_expediente = random.choice(mensagens_fim_expediente)
+    now = datetime.datetime.now(local_tz)
+    if now.weekday() == 5 and now.hour == 11:
+        channel = bot.get_channel(CHANNEL_ID)
+        mensagem_aleatoria_fim_expediente = random.choice(mensagens_fim_expediente)
 
-    embed_fim_expediente = discord.Embed(
-        title=mensagem_aleatoria_fim_expediente,
-        color=discord.Color.red()
-    )
-    await channel.send(embed=embed_fim_expediente)
+        embed_fim_expediente = discord.Embed(
+            title=mensagem_aleatoria_fim_expediente,
+            color=discord.Color.red()
+        )
+        await channel.send(embed=embed_fim_expediente)
 
 
 async def mensagem_programada(loop_func, check_func, interval):
@@ -549,7 +540,7 @@ async def mensagem_programada(loop_func, check_func, interval):
 async def mensagem_de_bom_dia_agendada():
     await mensagem_programada(
         enviar_bom_dia_e_lembrete_tickets,
-        lambda now: now.weekday() < 6 and now.hour == 8 and now.minute == 3,
+        lambda now: now.weekday() < 6 and now.hour == 10 and now.minute == 28,
         24 * 60 * 60,  # 24 horas
     )
 
@@ -557,7 +548,7 @@ async def mensagem_de_bom_dia_agendada():
 async def mensagem_de_boa_noite_agendada():
     await mensagem_programada(
         enviar_mensagem_de_boa_noite,
-        lambda now: now.weekday() <= 4 and now.hour == 17 and now.minute == 57,
+        lambda now: now.weekday() <= 4 and now.hour == 10 and now.minute == 29,
         24 * 60 * 60,  # 24 horas
     )
 
@@ -857,7 +848,7 @@ async def check_email():
             # Conectar ao servidor IMAP
             mail = imaplib.IMAP4_SSL(IMAP_SERVER)
             mail.login(EMAIL, PASSWORD)
-            mail.select("inbox")  # Seleciona a caixa de entrada
+            mail.select("inbox")  
             print('Conectado e verificando e-mails não lidos...')
 
             # Buscar por e-mails não lidos
@@ -877,15 +868,12 @@ async def check_email():
                     if isinstance(response_part, tuple):
                         msg = email.message_from_bytes(response_part[1])
 
-                        # Decodifica o campo "Subject"
                         subject, encoding = decode_header(msg["Subject"])[0]
                         if isinstance(subject, bytes):
                             subject = subject.decode(encoding if encoding else "utf-8")
 
-                        # Decodifica o campo "From"
                         from_ = msg.get("From")
                         from_decoded = decode_header(from_)
-
 
                         from_ = ""
                         for part, enc in from_decoded:
@@ -893,9 +881,11 @@ async def check_email():
                                 from_ += part.decode(enc if enc else 'utf-8')
                             else:
                                 from_ += part
-                        if from_.startswith("Re:"):
+
+                        if subject.startswith("Re:"):
                             continue
-                        
+
+                        # Lista de mensagens aleatórias
                         mensagens_aleatorias = [
                             f"📬 Novo e-mail chegando! ✉️",
                             f"💌 Você tem correspondência! 📨",
@@ -948,7 +938,7 @@ async def check_email():
 
                         if channel:
                             try:
-                                await channel.send(f"{proximo_analista.mention}, por favor abra o ticket para demanda, após solucionada entre em contato com o cliente, e encerre o ticket!")
+                                await channel.send(f"{proximo_analista.mention}, Por favor, abra o ticket para a demanda. Após ser solucionada, entre em contato com o cliente e, em seguida, encerre o ticket")
                                 await channel.send(embed=embed)
                                 print('Mensagem enviada com sucesso.')
                             except Exception as e:
@@ -964,11 +954,21 @@ async def check_email():
         await asyncio.sleep(300)
 
 
-@tasks.loop(time=datetime.time(hour=15, minute=57))
+@tasks.loop(minutes=1)
 async def enviar_relatorio_ron():
-    user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
-    await env_relat_todos(user_ids)
+    # Pega o dia da semana (0 = segunda-feira, 6 = domingo)
+    day_of_week = datetime.datetime.now().weekday()
+    current_time = datetime.datetime.now().time()
+    
+    # Envia de segunda a sexta às 15:57
+    if 0 <= day_of_week <= 4 and current_time.hour == 18 and current_time.minute == 5:
+        user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
+        await env_relat_todos(user_ids)
 
+    # Envia no sábado ao meio-dia (12:00)
+    elif day_of_week == 5 and current_time.hour == 12 and current_time.minute == 5:
+        user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
+        await env_relat_todos(user_ids)
 
 @tasks.loop(minutes=30)
 async def enviar_notas_negativas():
