@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from urllib.parse import quote_plus
 
+#### Módulo responsável pela conexão com o banco de dados
+
 load_dotenv()
 DB_USER: Final[str] = os.getenv('DB_USER')
 DB_PASSWORD: Final[str] = quote_plus(os.getenv('DB_PASSWORD'))

@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from database.connection import SessionLocal
 
+
 load_dotenv()
 
 
@@ -26,12 +27,19 @@ EMAIL: Final[str] = os.getenv("EMAIL")
 PASSWORD: Final[str] = os.getenv("PASSWORD")
 IMAP_SERVER: Final[str] = os.getenv("IMAP_SERVER")
 
+
 intents: Intents = Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 session = SessionLocal()
+
+
+def get_user_ids():
+    # Pega os IDs do .env e converte em uma lista de inteiros
+    USER_IDS = os.getenv("USER_IDS")
+    return list(map(int, USER_IDS.strip("[]").split(",")))
 
 
 def remove(Analyst: str) -> str:
@@ -74,7 +82,7 @@ mensagens_boa_noite = [
     "Descansem bem, amanhã será um novo dia cheio de conquistas! 🏆",
     "Vocês arrasaram hoje! Até amanhã! 👋",
     "Hora de recarregar as energias. Bom descanso! 🌙",
-    "Mais um dia vencido, parabéns a todos! Nos vemos amanhã! ✨"
+    "Mais um dia vencido, parabéns a todos! Nos vemos amanhã! ✨",
 ]
 
 mensagens_tickets = [
@@ -147,7 +155,7 @@ analistas = [
     "989520812358922260",
     "1242823825683517450",
     "1227952844707991695",
-    "1131548173467406338"
+    "1131548173467406338",
 ]
 
 analistas_restantes = []
@@ -244,7 +252,11 @@ def get_analyst_performance_embed(analyst_name=None):
         if analyst_name:
             # Retorno individual de um analista
             row = rows[0]
-            total_atendimentos, total_avaliados, total_satisfacao = row[1], row[2], row[3]
+            total_atendimentos, total_avaliados, total_satisfacao = (
+                row[1],
+                row[2],
+                row[3],
+            )
             conversao = (
                 (total_avaliados / total_atendimentos) * 100
                 if total_atendimentos > 0
@@ -256,21 +268,28 @@ def get_analyst_performance_embed(analyst_name=None):
                 title=f"📊 Desempenho de {analyst_name} - {datetime.datetime.now().strftime('%d/%m/%Y')}",
                 color=discord.Color.blue(),
             )
-            embed.add_field(name="Número de atendimentos",
-                            value=f"{total_atendimentos}", inline=False)
             embed.add_field(
-                name="Conversão", value=f"{conversao:.2f}% ({total_avaliados})", inline=False)
-            embed.add_field(name="Satisfação",
-                            value=f"{total_satisfacao}", inline=False)
+                name="Número de atendimentos",
+                value=f"{total_atendimentos}",
+                inline=False,
+            )
+            embed.add_field(
+                name="Conversão",
+                value=f"{conversao:.2f}% ({total_avaliados})",
+                inline=False,
+            )
+            embed.add_field(
+                name="Satisfação", value=f"{total_satisfacao}", inline=False
+            )
             embed.set_footer(
-                text=f"Atualizado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+                text=f"Atualizado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+            )
 
             return embed
         else:
             # Ranking de todos os analistas
             embed = discord.Embed(
                 title=f"📊 Progresso dos Analistas - {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-
                 color=discord.Color.purple(),
             )
 
@@ -284,11 +303,7 @@ def get_analyst_performance_embed(analyst_name=None):
                 # Adicionar emojis customizados
                 emoji = analyst_emojis.get(analyst, "")
 
-                embed.add_field(
-                    name="",
-                    value="",
-                    inline=False
-                )
+                embed.add_field(name="", value="", inline=False)
 
                 embed.add_field(
                     name=f"{emoji} {i}º {analyst}",
@@ -300,19 +315,12 @@ def get_analyst_performance_embed(analyst_name=None):
                     inline=False,
                 )
 
-            embed.add_field(
-                name="",
-                value="",
-                inline=False
-            )
+            embed.add_field(name="", value="", inline=False)
 
-            embed.add_field(
-                name="",
-                value="",
-                inline=False
-            )
+            embed.add_field(name="", value="", inline=False)
             embed.set_footer(
-                text=f"Atualizado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+                text=f"Atualizado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+            )
 
             return embed
 
@@ -374,7 +382,7 @@ async def on_ready():
     bot.loop.create_task(mensagem_de_boa_noite_agendada())
     bot.loop.create_task(mensagem_de_fim_expediente_agendada())
     await register_commands()  # Registre comandos quando o bot estiver pronto
-    alterar_status.start()    # Inicie a tarefa de alteração de status
+    alterar_status.start()  # Inicie a tarefa de alteração de status
     asyncio.create_task(check_email())
 
 
@@ -386,6 +394,7 @@ async def on_member_join(member):
             f"Bem-vindo(a) {member.mention} ao servidor! Esperamos que você se sinta em casa."
         )
 
+
 # BY RONALD LOPES
 # COMANDO GLOBAL PARA ESCUDO DEV
 # Função para registrar comandos globais
@@ -395,11 +404,11 @@ async def register_commands():
     app_commands = bot.tree
 
     # Defina o comando global
-    app_commands.add_command(discord.app_commands.Command(
-        name="hello",
-        description="Responde com 'Olá!'",
-        callback=hello
-    ))
+    app_commands.add_command(
+        discord.app_commands.Command(
+            name="hello", description="Responde com 'Olá!'", callback=hello
+        )
+    )
 
     # Sincronize os comandos com o Discord
     await bot.tree.sync()
@@ -407,7 +416,8 @@ async def register_commands():
 
 # Função do comando global
 async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message('Olá!')
+    await interaction.response.send_message("Olá!")
+
 
 # ATIVIDADES DO BOT ####################################################################
 # bot.activity = Activity(type=ActivityType.watching, name="VR Training")
@@ -419,7 +429,7 @@ atividades = [
     {"tipo": "jogando", "nome": "DASH Suporte"},
     {"tipo": "ouvindo", "nome": "Feedbacks"},
     {"tipo": "transmitindo", "nome": "No YouTube"},
-    {"tipo": "competindo", "nome": "Ranking Analistas"}
+    {"tipo": "competindo", "nome": "Ranking Analistas"},
 ]
 
 # Função para alterar a presença do bot periodicamente
@@ -435,16 +445,32 @@ async def alterar_status():
         if tipo == "jogando":
             await bot.change_presence(activity=discord.Game(name=nome))
         elif tipo == "assistindo":
-            await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=nome))
+            await bot.change_presence(
+                activity=discord.Activity(type=discord.ActivityType.watching, name=nome)
+            )
         elif tipo == "ouvindo":
-            await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=nome))
+            await bot.change_presence(
+                activity=discord.Activity(
+                    type=discord.ActivityType.listening, name=nome
+                )
+            )
         elif tipo == "competindo":
-            await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.competing, name=nome))
+            await bot.change_presence(
+                activity=discord.Activity(
+                    type=discord.ActivityType.competing, name=nome
+                )
+            )
         elif tipo == "transmitindo":
-            await bot.change_presence(activity=discord.Streaming(name=nome, url="https://www.youtube.com/watch?v=sQnMKU4QQrc"))
+            await bot.change_presence(
+                activity=discord.Streaming(
+                    name=nome, url="https://www.youtube.com/watch?v=sQnMKU4QQrc"
+                )
+            )
 
         # Aguarda 60 segundos antes de mudar para a próxima atividade
         await asyncio.sleep(30)
+
+
 ########################################################################################
 
 
@@ -462,19 +488,23 @@ async def enviar_bom_dia_e_lembrete_tickets():
         )
 
         frase_motivacional = random.choice(mensagens_motivacionais)
-        embed_mensagem.add_field(name="📜 Frase do Dia", value=frase_motivacional, inline=False)
+        embed_mensagem.add_field(
+            name="📜 Frase do Dia", value=frase_motivacional, inline=False
+        )
 
-        query = text("""
+        query = text(
+            """
             SELECT analyst, COUNT(ticket_id) AS ticket_count
             FROM tickets_data
             WHERE status = 'Em atendimento'
             GROUP BY analyst;
-        """)
+        """
+        )
 
         tickets_abertos = session.execute(query).fetchall()
 
         mensagem_tickets = random.choice(mensagens_tickets)
-        embed_mensagem.add_field(name=' ', value=mensagem_tickets, inline=False)
+        embed_mensagem.add_field(name=" ", value=mensagem_tickets, inline=False)
 
         if tickets_abertos:
             for row in tickets_abertos:
@@ -483,18 +513,19 @@ async def enviar_bom_dia_e_lembrete_tickets():
                 embed_mensagem.add_field(
                     name=f"{emoji} - {analyst}",
                     value=f"> {ticket_count} tickets em aberto.",
-                    inline=False
+                    inline=False,
                 )
         else:
             embed_mensagem.add_field(
                 name="🎫 Tickets em Aberto",
                 value="Nenhum ticket em aberto no momento.",
-                inline=False
+                inline=False,
             )
 
         await channel.send(embed=embed_mensagem)
-        print("Mensagem de bom dia e lembrete de tickets em aberto enviados com sucesso!")
-
+        print(
+            "Mensagem de bom dia e lembrete de tickets em aberto enviados com sucesso!"
+        )
 
 
 @tasks.loop(hours=24)
@@ -505,8 +536,7 @@ async def enviar_mensagem_de_boa_noite():
         mensagem_aleatoria_boa_noite = random.choice(mensagens_boa_noite)
 
         embed_boa_noite = discord.Embed(
-            title=mensagem_aleatoria_boa_noite,
-            color=discord.Color.dark_blue()
+            title=mensagem_aleatoria_boa_noite, color=discord.Color.dark_blue()
         )
 
         embed_boa_noite.set_footer(text="Ah, não vão esquecer de bater o ponto! 👋")
@@ -521,8 +551,7 @@ async def enviar_mensagem_de_fim_expediente():
         mensagem_aleatoria_fim_expediente = random.choice(mensagens_fim_expediente)
 
         embed_fim_expediente = discord.Embed(
-            title=mensagem_aleatoria_fim_expediente,
-            color=discord.Color.red()
+            title=mensagem_aleatoria_fim_expediente, color=discord.Color.red()
         )
         await channel.send(embed=embed_fim_expediente)
 
@@ -578,62 +607,44 @@ async def on_message(message):
         embed = discord.Embed(
             title="📜 Comandos Disponíveis",
             description="Aqui estão os comandos que você pode utilizar com o bot:",
-            color=discord.Color.orange()  # Escolha a cor do embed
+            color=discord.Color.orange(),  # Escolha a cor do embed
         )
 
         # Adiciona campos com os comandos
         embed.add_field(
             name="```$cambio```",
             value="Verifica se o bot está funcionando corretamente.",
-            inline=False
+            inline=False,
         )
 
-        embed.add_field(
-            name="",
-            value="",
-            inline=False
-        )
+        embed.add_field(name="", value="", inline=False)
 
         embed.add_field(
             name="```$desempenho```",
             value="Exibe o desempenho do analista que usou o comando.",
-            inline=False
+            inline=False,
         )
 
-        embed.add_field(
-            name="",
-            value="",
-            inline=False
-        )
+        embed.add_field(name="", value="", inline=False)
 
         embed.add_field(
             name="```$progresso```",
             value="Exibe o progresso de todos os analistas no dia.",
-            inline=False
+            inline=False,
         )
 
-        embed.add_field(
-            name="",
-            value="",
-            inline=False
-        )
+        embed.add_field(name="", value="", inline=False)
 
         embed.add_field(
             name="```$demandas```",
             value="Mostra as demandas em aberto dos analistas.",
-            inline=False
+            inline=False,
         )
 
-        embed.add_field(
-            name="",
-            value="",
-            inline=False
-        )
+        embed.add_field(name="", value="", inline=False)
 
         embed.add_field(
-            name="```$menu```",
-            value="Exibe esta lista de comandos.",
-            inline=False
+            name="```$menu```", value="Exibe esta lista de comandos.", inline=False
         )
 
         # Envia o embed como resposta
@@ -644,7 +655,7 @@ async def on_message(message):
         embed = discord.Embed(
             title="🤖 Teste de Câmbio",
             description="O bot está funcionando corretamente!",
-            color=discord.Color.green()
+            color=discord.Color.green(),
         )
         await message.channel.send(embed=embed)
 
@@ -671,12 +682,14 @@ async def on_message(message):
             await asyncio.sleep(3)
 
             # Exemplo de consulta usando SQLAlchemy
-            query = text("""
+            query = text(
+                """
                 SELECT analyst, COUNT(ticket_id) AS ticket_count
                 FROM tickets_data
                 WHERE status = 'Em atendimento'
                 GROUP BY analyst;
-            """)
+            """
+            )
 
             # Executar a consulta
             tickets_abertos = session.execute(query).fetchall()
@@ -687,7 +700,7 @@ async def on_message(message):
             # Cria o embed
             embed = discord.Embed(
                 title=mensagem_tickets,
-                color=discord.Color.orange()  # Escolha uma cor para o embed
+                color=discord.Color.orange(),  # Escolha uma cor para o embed
             )
             if tickets_abertos:
                 for row in tickets_abertos:
@@ -696,13 +709,13 @@ async def on_message(message):
                     embed.add_field(
                         name=f"{emoji} {analyst}",
                         value=f"> {ticket_count} tickets em aberto.",
-                        inline=False
+                        inline=False,
                     )
             else:
                 embed.add_field(
                     name="🔔 Nenhum ticket em aberto!",
                     value="Não há demandas em aberto no momento.",
-                    inline=False
+                    inline=False,
                 )
 
             # Adiciona um rodapé opcional
@@ -725,7 +738,7 @@ async def env_relat_todos(user_ids: list[int]):
             AND DATE("createdDate" AT TIME ZONE 'UTC') = :current_date
             """
         )
-        
+
         result_tickets = session.execute(query_tickets, {"current_date": current_date})
         rows_tickets = result_tickets.fetchall()
 
@@ -734,7 +747,7 @@ async def env_relat_todos(user_ids: list[int]):
             for row in rows_tickets:
                 ticket_id, value, analyst = row.ticket_id, row.value, row.analyst
                 ticket_url = f"https://vrsoftware.movidesk.com/Ticket/Edit/{ticket_id}"
-                
+
                 if value == "S/N":
                     mensagem_tickets += f"- [Ticket {ticket_id}]({ticket_url}) de {analyst}: Não recebeu uma avaliação.\n"
                 else:
@@ -750,7 +763,7 @@ async def env_relat_todos(user_ids: list[int]):
             WHERE DATE(change_date AT TIME ZONE 'UTC') = :current_date
             """
         )
-        
+
         result_changes = session.execute(query_changes, {"current_date": current_date})
         rows_changes = result_changes.fetchall()
 
@@ -782,7 +795,9 @@ async def env_relat_todos(user_ids: list[int]):
                 else:
                     print(f"Usuário com ID {user_id} não encontrado.")
             except discord.errors.DiscordException as e:
-                print(f"Erro ao enviar mensagem no Discord para o usuário {user_id}: {e}")
+                print(
+                    f"Erro ao enviar mensagem no Discord para o usuário {user_id}: {e}"
+                )
 
     except Exception as e:
         print(f"Ocorreu um erro ao gerar o relatório: {e}")
@@ -844,26 +859,26 @@ async def enviar_notas_negativ(user_ids: list[int]):
 async def check_email():
     while True:
         try:
-            print('Conectando ao servidor de e-mails...')
+            print("Conectando ao servidor de e-mails...")
             # Conectar ao servidor IMAP
             mail = imaplib.IMAP4_SSL(IMAP_SERVER)
             mail.login(EMAIL, PASSWORD)
-            mail.select("inbox")  
-            print('Conectado e verificando e-mails não lidos...')
+            mail.select("inbox")
+            print("Conectado e verificando e-mails não lidos...")
 
             # Buscar por e-mails não lidos
             status, messages = mail.search(None, "UNSEEN")
             mail_ids = messages[0].split()
 
             if not mail_ids:
-                print('Nenhum e-mail novo.')
+                print("Nenhum e-mail novo.")
             else:
-                print(f'{len(mail_ids)} novos e-mails encontrados.')
+                print(f"{len(mail_ids)} novos e-mails encontrados.")
 
             for mail_id in mail_ids:
                 # Busca o conteúdo do e-mail
                 status, msg_data = mail.fetch(mail_id, "(RFC822)")
-                
+
                 for response_part in msg_data:
                     if isinstance(response_part, tuple):
                         msg = email.message_from_bytes(response_part[1])
@@ -878,7 +893,7 @@ async def check_email():
                         from_ = ""
                         for part, enc in from_decoded:
                             if isinstance(part, bytes):
-                                from_ += part.decode(enc if enc else 'utf-8')
+                                from_ += part.decode(enc if enc else "utf-8")
                             else:
                                 from_ += part
 
@@ -897,28 +912,19 @@ async def check_email():
                             f"📥 Novo e-mail na área! 📨 Remetente: ",
                         ]
 
-                        mensagem_escolhida = random.choice(
-                            mensagens_aleatorias)
-                        print(f'Notificação de e-mail: {mensagem_escolhida}')
+                        mensagem_escolhida = random.choice(mensagens_aleatorias)
+                        print(f"Notificação de e-mail: {mensagem_escolhida}")
 
                         embed = discord.Embed(
                             title="📬 LOCAWEB.COM",
                             url="https://webmail-seguro.com.br/v2/?_task=mail&_mbox=INBOX",
                             description=mensagem_escolhida,
-                            color=discord.Color.green()  # Cor verde para notificação de e-mail
+                            color=discord.Color.green(),  # Cor verde para notificação de e-mail
                         )
 
-                        embed.add_field(
-                            name="**Assunto**",
-                            value=subject,
-                            inline=False
-                        )
+                        embed.add_field(name="**Assunto**", value=subject, inline=False)
 
-                        embed.add_field(
-                            name="**Remetente**",
-                            value=from_,
-                            inline=False
-                        )
+                        embed.add_field(name="**Remetente**", value=from_, inline=False)
 
                         embed.set_footer(
                             text="Verifique sua caixa de entrada para mais detalhes."
@@ -931,20 +937,24 @@ async def check_email():
                         # Envia a mensagem de embed no canal
                         channel = bot.get_channel(CHANNEL_ID)
                         # Verifique se o canal é válido
-                        print(f'Canal obtido: {channel}')
+                        print(f"Canal obtido: {channel}")
 
                         proximo_analista_id = get_proximo_analista()
-                        proximo_analista = await channel.guild.fetch_member(proximo_analista_id)
+                        proximo_analista = await channel.guild.fetch_member(
+                            proximo_analista_id
+                        )
 
                         if channel:
                             try:
-                                await channel.send(f"{proximo_analista.mention}, Por favor, abra o ticket para a demanda. Após ser solucionada, entre em contato com o cliente e, em seguida, encerre o ticket")
+                                await channel.send(
+                                    f"{proximo_analista.mention}, Por favor, abra o ticket para a demanda. Após ser solucionada, entre em contato com o cliente e, em seguida, encerre o ticket"
+                                )
                                 await channel.send(embed=embed)
-                                print('Mensagem enviada com sucesso.')
+                                print("Mensagem enviada com sucesso.")
                             except Exception as e:
-                                print(f'Erro ao enviar mensagem: {e}')
+                                print(f"Erro ao enviar mensagem: {e}")
                         else:
-                            print('Canal inválido ou não encontrado.')
+                            print("Canal inválido ou não encontrado.")
 
             mail.logout()
         except Exception as e:
@@ -959,21 +969,21 @@ async def enviar_relatorio_ron():
     # Pega o dia da semana (0 = segunda-feira, 6 = domingo)
     day_of_week = datetime.datetime.now().weekday()
     current_time = datetime.datetime.now().time()
-    
-    # Envia de segunda a sexta às 15:57
+
+    # Envia de segunda a sexta às 18:05
     if 0 <= day_of_week <= 4 and current_time.hour == 18 and current_time.minute == 5:
-        user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
+        user_ids = get_user_ids()  # Busca os IDs dinamicamente
         await env_relat_todos(user_ids)
 
-    # Envia no sábado ao meio-dia (12:00)
+    # Envia no sábado ao meio-dia (12:05)
     elif day_of_week == 5 and current_time.hour == 12 and current_time.minute == 5:
-        user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
+        user_ids = get_user_ids()  # Busca os IDs dinamicamente
         await env_relat_todos(user_ids)
+
 
 @tasks.loop(minutes=30)
 async def enviar_notas_negativas():
-    user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
-    # Substitua pelos IDs dos usuários desejados
+    user_ids = get_user_ids()  # Busca os IDs dinamicamente
     await enviar_notas_negativ(user_ids)
 
 
@@ -985,7 +995,7 @@ plantonistas = {
     2: "Adriel Sousa",
     3: "Rodolfo Joaquim",
     4: "Ronald Lopes",
-    5: "Adriel Sousa"
+    5: "Adriel Sousa",
 }
 
 
@@ -1005,9 +1015,13 @@ async def enviar_mensagem_plantonista():
 async def mensagem_plantonista_agendada():
     await mensagem_programada(
         enviar_mensagem_plantonista,
-        lambda now: now.weekday() < 5 and now.hour == 17 and now.minute == 50 or now.weekday(
-        ) == 5 and now.hour == 11 and now.minute == 57,
-        24 * 60 * 60  # 24 horas
+        lambda now: now.weekday() < 5
+        and now.hour == 17
+        and now.minute == 50
+        or now.weekday() == 5
+        and now.hour == 11
+        and now.minute == 57,
+        24 * 60 * 60,  # 24 horas
     )
 
 

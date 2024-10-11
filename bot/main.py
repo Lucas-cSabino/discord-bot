@@ -25,6 +25,10 @@ DB_URL: Final[str] = os.getenv("DATABASE_URL")
 EMAIL: Final[str] = os.getenv("EMAIL")
 PASSWORD: Final[str] = os.getenv("PASSWORD")
 IMAP_SERVER: Final[str] = os.getenv("IMAP_SERVER")
+USER_IDS: Final[list] = os.getenv("USER_IDS")
+
+user_ids = list(map(int, USER_IDS.strip('[]').split(',')))
+
 
 intents: Intents = Intents.default()
 intents.message_content = True
@@ -553,60 +557,73 @@ async def mensagem_programada(loop_func, check_func, interval):
         else:
             await asyncio.sleep(60)  # Verifica a cada minuto
 
+
+# Variáveis globais para rastrear o último envio das funções abaixo, evitando repetição diárias
 ultimo_bom_dia = None
 ultimo_boa_noite = None
 ultimo_fim_expediente = None
 
+
 async def mensagem_de_bom_dia_agendada():
+    # Função responsável por agendar a mensagem de bom dia
     global ultimo_bom_dia
     await mensagem_programada(
         enviar_bom_dia_e_lembrete_tickets,
         lambda now: (
-            now.weekday() < 6 and 
-            now.hour == 8 and 
-            now.minute == 45 and 
-            (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
+            now.weekday() < 6
+            and now.hour == 8
+            and now.minute == 3
+            and (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
     ultimo_bom_dia = datetime.datetime.now()
 
+
 async def mensagem_de_boa_noite_agendada():
+    # Função responsável por agendar a mensagem de boa noite
     global ultimo_boa_noite
     await mensagem_programada(
         enviar_mensagem_de_boa_noite,
         lambda now: (
-            now.weekday() <= 4 and 
-            now.hour == 8 and 
-            now.minute == 46 and 
-            (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
+            now.weekday() <= 4
+            and now.hour == 18
+            and now.minute == 3
+            and (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
     ultimo_boa_noite = datetime.datetime.now()
 
+
 async def mensagem_de_fim_expediente_agendada():
+    # Função responsável por enviar mensagem de fim de expediente no sábado
     global ultimo_fim_expediente
     await mensagem_programada(
         enviar_mensagem_de_fim_expediente,
         lambda now: (
-            now.weekday() == 5 and 
-            now.hour == 11 and 
-            now.minute == 57 and 
-            (ultimo_fim_expediente is None or ultimo_fim_expediente.date() != now.date())
+            now.weekday() == 5
+            and now.hour == 11
+            and now.minute == 57
+            and (
+                ultimo_fim_expediente is None
+                or ultimo_fim_expediente.date() != now.date()
+            )
         ),
         24 * 60 * 60,  # 24 horas
     )
     ultimo_fim_expediente = datetime.datetime.now()
 
+
 @bot.event
 async def on_message(message):
     """
     Função que captura os comandos enviados para o bot e retorna a execução de outras funções
-    $cambio: testa o funcionamento do bot
-    $desempenho: retorna o desempenho diário individual do analista solicitante
-    $progresso: retorna o desempenho diário de todos os analistas
-    $demandas: retorna o número de atendimentos em aberto que os analistas possuem
+    $cambio: Testa o funcionamento do bot
+    $desempenho: Retorna o desempenho diário individual do analista solicitante
+    $progresso: Retorna o desempenho diário de todos os analistas
+    $demandas: Retorna o número de atendimentos em aberto que os analistas possuem
+    $menu: Retorna para o usuário a lista de funções que o bot pode executa
     """
     if message.author == bot.user:
         return
@@ -625,7 +642,7 @@ async def on_message(message):
             value="Verifica se o bot está funcionando corretamente.",
             inline=False,
         )
-
+        # Adicionando campos em branco para formatação do Embed
         embed.add_field(name="", value="", inline=False)
 
         embed.add_field(
@@ -653,14 +670,17 @@ async def on_message(message):
         embed.add_field(name="", value="", inline=False)
 
         embed.add_field(
-            name="```$menu```", value="Exibe esta lista de comandos.", inline=False
+            # $menu: Retorna para o usuário a lista de funções que o bot pode executa
+            name="```$menu```",
+            value="Exibe esta lista de comandos.",
+            inline=False,
         )
 
         # Envia o embed como resposta
         await message.channel.send(embed=embed)
 
     elif message.content.startswith("$cambio"):
-        # Embed básico de resposta de funcionamento
+        # $cambio: testa o funcionamento do bot
         embed = discord.Embed(
             title="🤖 Teste de Câmbio",
             description="O bot está funcionando corretamente!",
@@ -669,6 +689,7 @@ async def on_message(message):
         await message.channel.send(embed=embed)
 
     elif message.content.startswith("$desempenho"):
+        # $desempenho: retorna o desempenho diário individual do analista solicitante
         analyst_name = message.author.display_name
 
         async with message.channel.typing():
@@ -679,6 +700,7 @@ async def on_message(message):
             await message.channel.send(embed=performance_embed)
 
     elif message.content.startswith("$progresso"):
+        # $progresso: retorna o desempenho diário de todos os analistas
         async with message.channel.typing():
             await asyncio.sleep(3)
 
@@ -687,6 +709,7 @@ async def on_message(message):
             await message.channel.send(embed=performance_report_embed)
 
     elif message.content.startswith("$demandas"):
+        # $demandas: retorna o número de atendimentos em aberto que os analistas possuem
         async with message.channel.typing():
             await asyncio.sleep(3)
 
@@ -736,6 +759,10 @@ async def on_message(message):
 
 
 async def env_relat_todos(user_ids: list[int]):
+    """
+    Função agendada, que quando solicitada, captura os IDs dos usuários do discord e envia
+    um relatório do desempenho dos analistas
+    """
     try:
         # Consulta para tickets não avaliados ou com notas baixas
         query_tickets = text(
@@ -993,7 +1020,6 @@ async def enviar_relatorio_ron():
 @tasks.loop(minutes=30)
 async def enviar_notas_negativas():
     user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
-    # Substitua pelos IDs dos usuários desejados
     await enviar_notas_negativ(user_ids)
 
 
