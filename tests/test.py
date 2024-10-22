@@ -16,7 +16,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from database.connection import SessionLocal
 
-
 load_dotenv()
 
 
@@ -27,19 +26,12 @@ EMAIL: Final[str] = os.getenv("EMAIL")
 PASSWORD: Final[str] = os.getenv("PASSWORD")
 IMAP_SERVER: Final[str] = os.getenv("IMAP_SERVER")
 
-
 intents: Intents = Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 session = SessionLocal()
-
-
-def get_user_ids():
-    # Pega os IDs do .env e converte em uma lista de inteiros
-    USER_IDS = os.getenv("USER_IDS")
-    return list(map(int, USER_IDS.strip("[]").split(",")))
 
 
 def remove(Analyst: str) -> str:
@@ -415,6 +407,8 @@ async def register_commands():
 
 
 # Função do comando global
+
+
 async def hello(interaction: discord.Interaction):
     await interaction.response.send_message("Olá!")
 
@@ -474,86 +468,80 @@ async def alterar_status():
 ########################################################################################
 
 
-# Enviar mensagem de bom dia e lembrete de tickets
-@tasks.loop(hours=24)
 async def enviar_bom_dia_e_lembrete_tickets():
-    now = datetime.datetime.now(local_tz)
-    if now.weekday() < 6 and now.hour == 8:
-        channel = bot.get_channel(CHANNEL_ID)
+    channel = bot.get_channel(CHANNEL_ID)
 
-        embed_mensagem = discord.Embed(
-            title="☀️ Bom dia e Atualização de Tickets",
-            description="Lembrem-se de bater o ponto, a Camila agradece 😘",
-            color=discord.Color.green(),
-        )
+    # Criação do embed unificado
+    embed_mensagem = discord.Embed(
+        title="☀️ Bom dia e Atualização de Tickets",
+        description="Lembrem-se de bater o ponto, a Camila agradece 😘",
+        color=discord.Color.green(),
+    )
 
-        frase_motivacional = random.choice(mensagens_motivacionais)
-        embed_mensagem.add_field(
-            name="📜 Frase do Dia", value=frase_motivacional, inline=False
-        )
+    # Adicionando a frase motivacional
+    frase_motivacional = random.choice(mensagens_motivacionais)
+    embed_mensagem.add_field(
+        name="📜 Frase do Dia", value=frase_motivacional, inline=False
+    )
 
-        query = text(
-            """
-            SELECT analyst, COUNT(ticket_id) AS ticket_count
-            FROM tickets_data
-            WHERE status = 'Em atendimento'
-            GROUP BY analyst;
+    # Consulta para buscar tickets em aberto por analista
+    query = text(
         """
-        )
+        SELECT analyst, COUNT(ticket_id) AS ticket_count
+        FROM tickets_data
+        WHERE status = 'Em atendimento'
+        GROUP BY analyst;
+    """
+    )
 
-        tickets_abertos = session.execute(query).fetchall()
+    tickets_abertos = session.execute(query).fetchall()
 
-        mensagem_tickets = random.choice(mensagens_tickets)
-        embed_mensagem.add_field(name=" ", value=mensagem_tickets, inline=False)
+    mensagem_tickets = random.choice(mensagens_tickets)
 
-        if tickets_abertos:
-            for row in tickets_abertos:
-                analyst, ticket_count = row.analyst, row.ticket_count
-                emoji = analyst_emojis.get(analyst, "")
-                embed_mensagem.add_field(
-                    name=f"{emoji} - {analyst}",
-                    value=f"> {ticket_count} tickets em aberto.",
-                    inline=False,
-                )
-        else:
+    embed_mensagem.add_field(name=" ", value=mensagem_tickets, inline=False)
+
+    # Adicionando o lembrete de tickets ao embed
+    if tickets_abertos:
+        for row in tickets_abertos:
+            analyst, ticket_count = row.analyst, row.ticket_count
+            emoji = analyst_emojis.get(analyst, "")
             embed_mensagem.add_field(
-                name="🎫 Tickets em Aberto",
-                value="Nenhum ticket em aberto no momento.",
+                name=f"{emoji} - {analyst}",
+                value=f"> {ticket_count} tickets em aberto.",
                 inline=False,
             )
-
-        await channel.send(embed=embed_mensagem)
-        print(
-            "Mensagem de bom dia e lembrete de tickets em aberto enviados com sucesso!"
+    else:
+        embed_mensagem.add_field(
+            name="🎫 Tickets em Aberto",
+            value="Nenhum ticket em aberto no momento.",
+            inline=False,
         )
 
+    # Envia o embed com a mensagem de bom dia e lembrete de tickets
+    await channel.send(embed=embed_mensagem)
+    print("Mensagem de bom dia e lembrete de tickets em aberto enviados com sucesso!")
 
-@tasks.loop(hours=24)
+
 async def enviar_mensagem_de_boa_noite():
-    now = datetime.datetime.now(local_tz)
-    if now.weekday() <= 4 and now.hour == 8:
-        channel = bot.get_channel(CHANNEL_ID)
-        mensagem_aleatoria_boa_noite = random.choice(mensagens_boa_noite)
+    channel = bot.get_channel(CHANNEL_ID)
+    mensagem_aleatoria_boa_noite = random.choice(mensagens_boa_noite)
 
-        embed_boa_noite = discord.Embed(
-            title=mensagem_aleatoria_boa_noite, color=discord.Color.dark_blue()
-        )
+    embed_boa_noite = discord.Embed(
+        title=mensagem_aleatoria_boa_noite, color=discord.Color.dark_blue()
+    )
 
-        embed_boa_noite.set_footer(text="Ah, não vão esquecer de bater o ponto! 👋")
-        await channel.send("@everyone", embed=embed_boa_noite)
+    embed_boa_noite.set_footer(text="Ah, não vão esquecer de bater o ponto! 👋")
+    await channel.send("@everyone", embed=embed_boa_noite)
 
 
-@tasks.loop(hours=24)
 async def enviar_mensagem_de_fim_expediente():
-    now = datetime.datetime.now(local_tz)
-    if now.weekday() == 5 and now.hour == 11:
-        channel = bot.get_channel(CHANNEL_ID)
-        mensagem_aleatoria_fim_expediente = random.choice(mensagens_fim_expediente)
+    channel = bot.get_channel(CHANNEL_ID)
+    mensagem_aleatoria_fim_expediente = random.choice(mensagens_fim_expediente)
 
-        embed_fim_expediente = discord.Embed(
-            title=mensagem_aleatoria_fim_expediente, color=discord.Color.red()
-        )
-        await channel.send(embed=embed_fim_expediente)
+    embed_fim_expediente = discord.Embed(
+        title=mensagem_aleatoria_fim_expediente, color=discord.Color.red()
+    )
+    await channel.send(embed=embed_fim_expediente)
 
 
 async def mensagem_programada(loop_func, check_func, interval):
@@ -566,28 +554,57 @@ async def mensagem_programada(loop_func, check_func, interval):
             await asyncio.sleep(60)  # Verifica a cada minuto
 
 
+ultimo_bom_dia = None
+ultimo_boa_noite = None
+ultimo_fim_expediente = None
+
+
 async def mensagem_de_bom_dia_agendada():
+    global ultimo_bom_dia
     await mensagem_programada(
         enviar_bom_dia_e_lembrete_tickets,
-        lambda now: now.weekday() < 6 and now.hour == 10 and now.minute == 28,
+        lambda now: (
+            now.weekday() < 6
+            and now.hour == 8
+            and now.minute == 3
+            and (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
+        ),
         24 * 60 * 60,  # 24 horas
     )
+    ultimo_bom_dia = datetime.datetime.now()
 
 
 async def mensagem_de_boa_noite_agendada():
+    global ultimo_boa_noite
     await mensagem_programada(
         enviar_mensagem_de_boa_noite,
-        lambda now: now.weekday() <= 4 and now.hour == 10 and now.minute == 29,
+        lambda now: (
+            now.weekday() <= 4
+            and now.hour == 18
+            and now.minute == 3
+            and (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
+        ),
         24 * 60 * 60,  # 24 horas
     )
+    ultimo_boa_noite = datetime.datetime.now()
 
 
 async def mensagem_de_fim_expediente_agendada():
+    global ultimo_fim_expediente
     await mensagem_programada(
         enviar_mensagem_de_fim_expediente,
-        lambda now: now.weekday() == 5 and now.hour == 11 and now.minute == 57,
+        lambda now: (
+            now.weekday() == 5
+            and now.hour == 11
+            and now.minute == 57
+            and (
+                ultimo_fim_expediente is None
+                or ultimo_fim_expediente.date() != now.date()
+            )
+        ),
         24 * 60 * 60,  # 24 horas
     )
+    ultimo_fim_expediente = datetime.datetime.now()
 
 
 @bot.event
@@ -897,7 +914,12 @@ async def check_email():
                             else:
                                 from_ += part
 
-                        if subject.startswith("Re:"):
+                        subject_skit = ["Re:", "RES:", "Sped Contribuições"]
+
+                        if subject.startswith("Re:") or subject.startswith("RES:"):
+                            continue
+
+                        elif from_ == "adriel.sousa@vrbelem.com.br":
                             continue
 
                         # Lista de mensagens aleatórias
@@ -970,20 +992,21 @@ async def enviar_relatorio_ron():
     day_of_week = datetime.datetime.now().weekday()
     current_time = datetime.datetime.now().time()
 
-    # Envia de segunda a sexta às 18:05
+    # Envia de segunda a sexta às 15:57
     if 0 <= day_of_week <= 4 and current_time.hour == 18 and current_time.minute == 5:
-        user_ids = get_user_ids()  # Busca os IDs dinamicamente
+        user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
         await env_relat_todos(user_ids)
 
-    # Envia no sábado ao meio-dia (12:05)
+    # Envia no sábado ao meio-dia (12:00)
     elif day_of_week == 5 and current_time.hour == 12 and current_time.minute == 5:
-        user_ids = get_user_ids()  # Busca os IDs dinamicamente
+        user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
         await env_relat_todos(user_ids)
 
 
 @tasks.loop(minutes=30)
 async def enviar_notas_negativas():
-    user_ids = get_user_ids()  # Busca os IDs dinamicamente
+    user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
+    # Substitua pelos IDs dos usuários desejados
     await enviar_notas_negativ(user_ids)
 
 
