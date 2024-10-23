@@ -440,8 +440,7 @@ async def alterar_status():
             await bot.change_presence(activity=discord.Game(name=nome))
         elif tipo == "assistindo":
             await bot.change_presence(
-                activity=discord.Activity(
-                    type=discord.ActivityType.watching, name=nome)
+                activity=discord.Activity(type=discord.ActivityType.watching, name=nome)
             )
         elif tipo == "ouvindo":
             await bot.change_presence(
@@ -554,6 +553,7 @@ async def mensagem_programada(loop_func, check_func, interval):
         else:
             await asyncio.sleep(60)  # Verifica a cada minuto
 
+
 ultimo_bom_dia = None
 ultimo_boa_noite = None
 ultimo_fim_expediente = None
@@ -564,10 +564,10 @@ async def mensagem_de_bom_dia_agendada():
     await mensagem_programada(
         enviar_bom_dia_e_lembrete_tickets,
         lambda now: (
-            now.weekday() < 6 and
-            now.hour == 8 and
-            now.minute == 3 and
-            (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
+            now.weekday() < 6
+            and now.hour == 8
+            and now.minute == 3
+            and (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
@@ -579,10 +579,10 @@ async def mensagem_de_boa_noite_agendada():
     await mensagem_programada(
         enviar_mensagem_de_boa_noite,
         lambda now: (
-            now.weekday() <= 4 and
-            now.hour == 18 and
-            now.minute == 3 and
-            (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
+            now.weekday() <= 4
+            and now.hour == 18
+            and now.minute == 3
+            and (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
@@ -594,10 +594,13 @@ async def mensagem_de_fim_expediente_agendada():
     await mensagem_programada(
         enviar_mensagem_de_fim_expediente,
         lambda now: (
-            now.weekday() == 5 and
-            now.hour == 11 and
-            now.minute == 57 and
-            (ultimo_fim_expediente is None or ultimo_fim_expediente.date() != now.date())
+            now.weekday() == 5
+            and now.hour == 11
+            and now.minute == 57
+            and (
+                ultimo_fim_expediente is None
+                or ultimo_fim_expediente.date() != now.date()
+            )
         ),
         24 * 60 * 60,  # 24 horas
     )
@@ -753,8 +756,7 @@ async def env_relat_todos(user_ids: list[int]):
             """
         )
 
-        result_tickets = session.execute(
-            query_tickets, {"current_date": current_date})
+        result_tickets = session.execute(query_tickets, {"current_date": current_date})
         rows_tickets = result_tickets.fetchall()
 
         mensagem_tickets = "Relatório de tickets não avaliados ou com notas baixas:\n"
@@ -779,8 +781,7 @@ async def env_relat_todos(user_ids: list[int]):
             """
         )
 
-        result_changes = session.execute(
-            query_changes, {"current_date": current_date})
+        result_changes = session.execute(query_changes, {"current_date": current_date})
         rows_changes = result_changes.fetchall()
 
         mensagem_changes = "\nRelatório de mudanças de notas de tickets no dia:\n"
@@ -901,8 +902,7 @@ async def check_email():
 
                         subject, encoding = decode_header(msg["Subject"])[0]
                         if isinstance(subject, bytes):
-                            subject = subject.decode(
-                                encoding if encoding else "utf-8")
+                            subject = subject.decode(encoding if encoding else "utf-8")
 
                         from_ = msg.get("From")
                         from_decoded = decode_header(from_)
@@ -914,10 +914,7 @@ async def check_email():
                             else:
                                 from_ += part
 
-                        subject_skit = ["Re:",
-                                        "RES:",
-                                        "Sped Contribuições"
-                                        ]
+                        subject_skit = ["Re:", "RES:", "Sped Contribuições"]
 
                         if subject.startswith("Re:") or subject.startswith("RES:"):
                             continue
@@ -937,8 +934,7 @@ async def check_email():
                             f"📥 Novo e-mail na área! 📨 Remetente: ",
                         ]
 
-                        mensagem_escolhida = random.choice(
-                            mensagens_aleatorias)
+                        mensagem_escolhida = random.choice(mensagens_aleatorias)
                         print(f"Notificação de e-mail: {mensagem_escolhida}")
 
                         embed = discord.Embed(
@@ -948,11 +944,9 @@ async def check_email():
                             color=discord.Color.green(),  # Cor verde para notificação de e-mail
                         )
 
-                        embed.add_field(name="**Assunto**",
-                                        value=subject, inline=False)
+                        embed.add_field(name="**Assunto**", value=subject, inline=False)
 
-                        embed.add_field(name="**Remetente**",
-                                        value=from_, inline=False)
+                        embed.add_field(name="**Remetente**", value=from_, inline=False)
 
                         embed.set_footer(
                             text="Verifique sua caixa de entrada para mais detalhes."
