@@ -154,6 +154,11 @@ analistas_restantes = []
 
 
 def get_proximo_analista():
+    """Embaralha a lista de analistas e evita repetição para o recebimento de e-mails
+
+    Returns:
+        list: analistas restantes que receberão e-mail
+    """
     global analistas_restantes
 
     if not analistas_restantes:
@@ -173,10 +178,20 @@ target_time = datetime.time(hour=12, minute=40, tzinfo=local_tz)
 
 
 def get_analyst_performance_embed(analyst_name=None):
-    """
-    Função para calcular o desempenho dos analistas e retornar um embed formatado.
-    :params analsyt_name: recebe o nome do analista (para $desempenho individual)
-                          ou None (para $progresso geral).
+    """Faz uma consulta no banco de dados com base no dia atual.
+    dependendo do args, trás um relatório do progresso dos analistas
+    ou o desemepnho de um analista específico
+
+    Args:
+        analyst_name (str, optional): Se o nome do analista dado
+        retorna o progresso individual do analista solicitante no discord.
+        Se analyst_name = None, o desempenho de todos os analistas é retornado
+        no chat do discord
+
+
+    Returns:
+        discord_embed: Retorna o relatório em formato Embed do discord, de forma
+        rankeada para medir o desempenho dos analistas
     """
     try:
         # Subconsulta para filtrar tickets
@@ -187,10 +202,10 @@ def get_analyst_performance_embed(analyst_name=None):
                 FROM tickets_data
                 WHERE DATE("createdDate" AT TIME ZONE 'UTC') = :current_date
                 ORDER BY ticket_id, 
-                         CASE 
-                             WHEN type = 'resolvido' THEN 1 
-                             ELSE 2 
-                         END
+                        CASE 
+                            WHEN type = 'resolvido' THEN 1 
+                            ELSE 2 
+                        END
             )
         """
 
@@ -327,14 +342,15 @@ def get_analyst_performance_embed(analyst_name=None):
 
 
 async def send_daily_report():
+    """Função que aguarda o bot estar pronto para mandar no canal específico
+    e chama a função que cria os Embeds no discord
+    """
     await bot.wait_until_ready()
     channel = bot.get_channel(CHANNEL_ID)
 
     if channel:
-        # Obtém o embed com o relatório de desempenho
         performance_report_embed = get_analyst_performance_embed()
 
-        # Envia o embed no canal do Discord
         await channel.send(embed=performance_report_embed)
     else:
         print("Canal não encontrado.")
@@ -359,6 +375,10 @@ async def enviar_relatorio_diario():
 
 @bot.event
 async def on_ready():
+    """Função principal inicializadora das funções do bot que dependem
+    de verificação de horário para inicializarem.
+    A função cria as tarefas para o bot.
+    """
     print(f"Bot conectado como {bot.user}")
 
     if not enviar_relatorio_ron.is_running():
@@ -380,6 +400,11 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
+    """Retorna uma mensagem de boas vindas para novos usuários do discord
+
+    Args:
+        member (int): ID do membro que entrou no servidor
+    """
     channel = member.guild.get_channel(CHANNEL_ID)
     if channel is not None:
         await channel.send(
@@ -469,6 +494,14 @@ async def alterar_status():
 
 
 async def enviar_bom_dia_e_lembrete_tickets():
+    """Função que envia ao horário agendado no início do dia os lembretes
+    em aberto de cada analista, enviando também uma mensagem motivacional.
+
+    A função acessa o banco de dados para ter acesso as informações dos tickets com status
+    "Em atendimento".
+    Se houver tickets abertos, a função cria o Embed e envia o relatório com os tickets
+    Se não houver tickets em aberto, a função informa no discord e finaliza.
+    """
     channel = bot.get_channel(CHANNEL_ID)
 
     # Criação do embed unificado
@@ -523,6 +556,7 @@ async def enviar_bom_dia_e_lembrete_tickets():
 
 
 async def enviar_mensagem_de_boa_noite():
+    """Envia mensagem de boa noite no fim do expediente nos dias de semana"""
     channel = bot.get_channel(CHANNEL_ID)
     mensagem_aleatoria_boa_noite = random.choice(mensagens_boa_noite)
 
@@ -535,6 +569,7 @@ async def enviar_mensagem_de_boa_noite():
 
 
 async def enviar_mensagem_de_fim_expediente():
+    """envia mensagens de despedida somente aos sábados"""
     channel = bot.get_channel(CHANNEL_ID)
     mensagem_aleatoria_fim_expediente = random.choice(mensagens_fim_expediente)
 
@@ -545,6 +580,15 @@ async def enviar_mensagem_de_fim_expediente():
 
 
 async def mensagem_programada(loop_func, check_func, interval):
+    """Responsável por checkar a cada 60 segundos se as funções agendadas se encontram
+    em seus respectivos horários para serem enviadas em seus respectivos horários
+
+    Args:
+        loop_func (function): função que está agendada
+        check_func (function): função lambda, responsável por chekcar o horáro especificado
+        e evitar que a função envie mais de uma vez no mesmo dia
+        interval (Int): Intervalo definido para ser enviado uma vez por dia
+    """
     while True:
         now = datetime.datetime.now()
         if check_func(now):
@@ -560,6 +604,9 @@ ultimo_fim_expediente = None
 
 
 async def mensagem_de_bom_dia_agendada():
+    """função assíncrona que chama a função mensagem_programada passando os parâmetros necessários
+    para o funcionamento da função no horário correto.
+    """
     global ultimo_bom_dia
     await mensagem_programada(
         enviar_bom_dia_e_lembrete_tickets,
@@ -575,6 +622,9 @@ async def mensagem_de_bom_dia_agendada():
 
 
 async def mensagem_de_boa_noite_agendada():
+    """função assíncrona que chama a função mensagem_programada passando os parâmetros necessários
+    para o funcionamento da função no horário correto.
+    """
     global ultimo_boa_noite
     await mensagem_programada(
         enviar_mensagem_de_boa_noite,
@@ -590,6 +640,9 @@ async def mensagem_de_boa_noite_agendada():
 
 
 async def mensagem_de_fim_expediente_agendada():
+    """função assíncrona que chama a função mensagem_programada passando os parâmetros necessários
+    para o funcionamento da função no horário correto.
+    """
     global ultimo_fim_expediente
     await mensagem_programada(
         enviar_mensagem_de_fim_expediente,
@@ -609,13 +662,15 @@ async def mensagem_de_fim_expediente_agendada():
 
 @bot.event
 async def on_message(message):
-    """
-    Função que captura os comandos enviados para o bot e retorna a execução de outras funções
-    $cambio: testa o funcionamento do bot
-    $desempenho: retorna o desempenho diário individual do analista solicitante
-    $progresso: retorna o desempenho diário de todos os analistas
-    $demandas: retorna o número de atendimentos em aberto que os analistas possuem
-    """
+    """Função responsável por capturar os comandos enviados no servidor.
+    A função captura os comandos $menu, $cambio, $desempenho, $progresso
+    e $demandas
+    Retorna nada se a função entender que quem enviou a mensagem foi o bot
+    evitando um loop infinito
+
+    Args:
+        message (str): mensagem do discord enviada pelos usuários
+    """    
     if message.author == bot.user:
         return
 
@@ -744,6 +799,16 @@ async def on_message(message):
 
 
 async def env_relat_todos(user_ids: list[int]):
+    """Função responsável por enviar os relatórios para os IDs informados previamente.
+    A função consulta no banco de dados os tickets em que não foram avaliados, ou foram
+    com notas negativas.
+    A função também informa as mudanças de notas, se foram de não avaliadas para avaliadas
+    ou se mudaram de nota negativa para positivas.
+    
+
+    Args:
+        user_ids (int): o ID dos usuários do discord
+    """    
     try:
         # Consulta para tickets não avaliados ou com notas baixas
         query_tickets = text(
@@ -821,6 +886,14 @@ async def env_relat_todos(user_ids: list[int]):
 
 
 async def enviar_notas_negativ(user_ids: list[int]):
+    """Função que envia as notas negativas sempre que ocorrem para os usuários
+    com ID registrados.
+    A função acessa o banco de dados e pesquisa sempre para o dia atual, todas as notas
+    negativas obtidas pelos analistas de suporte.
+
+    Args:
+        user_ids (int): os ID's dos usuários
+    """    
     try:
         query = text(
             """
@@ -874,6 +947,11 @@ async def enviar_notas_negativ(user_ids: list[int]):
 
 
 async def check_email():
+    """Função responsável por acessar o o LocaWEB para verificar os e-mails
+    na caxa de entrada no suporte. 
+    A função envia no chat do discord, marcando os analistas com a função
+    get_proximo_analsta, que evita repetições de menções.
+    """    
     while True:
         try:
             print("Conectando ao servidor de e-mails...")
@@ -988,6 +1066,9 @@ async def check_email():
 
 @tasks.loop(minutes=1)
 async def enviar_relatorio_ron():
+    """Função responsável por enviar os relatórios ao fim do expediente para os usuários com ID 
+    cadastrado nessa função
+    """    
     # Pega o dia da semana (0 = segunda-feira, 6 = domingo)
     day_of_week = datetime.datetime.now().weekday()
     current_time = datetime.datetime.now().time()
@@ -1005,6 +1086,9 @@ async def enviar_relatorio_ron():
 
 @tasks.loop(minutes=30)
 async def enviar_notas_negativas():
+    """Função responsável por mandar as notas negativas a cada 30 minutos 
+    para os usuários com ID cadastrado nessa função
+    """    
     user_ids = [717003940218273833, 695623814360334336, 696725073616175207]
     # Substitua pelos IDs dos usuários desejados
     await enviar_notas_negativ(user_ids)
@@ -1023,6 +1107,8 @@ plantonistas = {
 
 
 async def enviar_mensagem_plantonista():
+    """_summary_
+    """    
     now = datetime.datetime.now()
     dia_da_semana = now.weekday()
     if dia_da_semana in plantonistas:
