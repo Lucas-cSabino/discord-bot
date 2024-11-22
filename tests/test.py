@@ -673,6 +673,25 @@ async def on_message(message):
         )
         await message.channel.send(embed=embed)
 
+    elif message.content.startswith("$desempenho"):
+        analyst_name = message.author.display_name
+
+        async with message.channel.typing():
+            await asyncio.sleep(2)
+
+            # Aqui chamamos a função get_analyst_performance que agora retorna um embed
+            performance_embed = get_analyst_performance_embed(analyst_name)
+            await message.channel.send(embed=performance_embed)
+
+    elif message.content.startswith("$progresso"):
+        async with message.channel.typing():
+            await asyncio.sleep(3)
+
+            # Aqui chamamos a função que retorna o progresso de todos os analistas
+            performance_report_embed = get_analyst_performance_embed()
+            await message.channel.send(embed=performance_report_embed)
+
+
     elif message.content.startswith("$demandas"):
         async with message.channel.typing():
             await asyncio.sleep(3)
