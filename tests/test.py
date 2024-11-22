@@ -440,7 +440,8 @@ async def alterar_status():
             await bot.change_presence(activity=discord.Game(name=nome))
         elif tipo == "assistindo":
             await bot.change_presence(
-                activity=discord.Activity(type=discord.ActivityType.watching, name=nome)
+                activity=discord.Activity(
+                    type=discord.ActivityType.watching, name=nome)
             )
         elif tipo == "ouvindo":
             await bot.change_presence(
@@ -553,7 +554,6 @@ async def mensagem_programada(loop_func, check_func, interval):
         else:
             await asyncio.sleep(60)  # Verifica a cada minuto
 
-
 ultimo_bom_dia = None
 ultimo_boa_noite = None
 ultimo_fim_expediente = None
@@ -564,10 +564,10 @@ async def mensagem_de_bom_dia_agendada():
     await mensagem_programada(
         enviar_bom_dia_e_lembrete_tickets,
         lambda now: (
-            now.weekday() < 6
-            and now.hour == 8
-            and now.minute == 3
-            and (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
+            now.weekday() < 6 and
+            now.hour == 8 and
+            now.minute == 3 and
+            (ultimo_bom_dia is None or ultimo_bom_dia.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
@@ -579,10 +579,10 @@ async def mensagem_de_boa_noite_agendada():
     await mensagem_programada(
         enviar_mensagem_de_boa_noite,
         lambda now: (
-            now.weekday() <= 4
-            and now.hour == 18
-            and now.minute == 3
-            and (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
+            now.weekday() <= 4 and
+            now.hour == 18 and
+            now.minute == 3 and
+            (ultimo_boa_noite is None or ultimo_boa_noite.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
@@ -594,13 +594,10 @@ async def mensagem_de_fim_expediente_agendada():
     await mensagem_programada(
         enviar_mensagem_de_fim_expediente,
         lambda now: (
-            now.weekday() == 5
-            and now.hour == 11
-            and now.minute == 57
-            and (
-                ultimo_fim_expediente is None
-                or ultimo_fim_expediente.date() != now.date()
-            )
+            now.weekday() == 5 and
+            now.hour == 11 and
+            now.minute == 57 and
+            (ultimo_fim_expediente is None or ultimo_fim_expediente.date() != now.date())
         ),
         24 * 60 * 60,  # 24 horas
     )
@@ -676,30 +673,11 @@ async def on_message(message):
         )
         await message.channel.send(embed=embed)
 
-    elif message.content.startswith("$desempenho"):
-        analyst_name = message.author.display_name
-
-        async with message.channel.typing():
-            await asyncio.sleep(2)
-
-            # Aqui chamamos a função get_analyst_performance que agora retorna um embed
-            performance_embed = get_analyst_performance_embed(analyst_name)
-            await message.channel.send(embed=performance_embed)
-
-    elif message.content.startswith("$progresso"):
-        async with message.channel.typing():
-            await asyncio.sleep(3)
-
-            # Aqui chamamos a função que retorna o progresso de todos os analistas
-            performance_report_embed = get_analyst_performance_embed()
-            await message.channel.send(embed=performance_report_embed)
-
     elif message.content.startswith("$demandas"):
         async with message.channel.typing():
             await asyncio.sleep(3)
 
-            # Exemplo de consulta usando SQLAlchemy
-            query = text(
+            query1 = text(
                 """
                 SELECT analyst, COUNT(ticket_id) AS ticket_count
                 FROM tickets_data
@@ -708,43 +686,79 @@ async def on_message(message):
             """
             )
 
-            # Executar a consulta
-            tickets_abertos = session.execute(query).fetchall()
+            query2 = text(
+                """
+                SELECT "businessName", COUNT(ticket_id) AS ticket_count
+                FROM tickets_matriz
+                WHERE status in (
+                'Em atendimento',
+                'Aguardando resposta da Matriz',
+                'Aguardando Retorno Cliente',
+                'AGUARDANDO PRODUTO',
+                'AGUARDANDO N2',
+                'EM ANALISE N2',
+                'Aguardando N2 - Fiscal',
+                'Em Analise - Produto')
+                GROUP BY "businessName"
+            """
+            )
 
-            # Escolhe uma mensagem aleatória para o título do embed
+            tickets_abertos = session.execute(query1).fetchall()
+            tickets_matriz = session.execute(query2).fetchall()
+
             mensagem_tickets = random.choice(mensagens_tickets)
 
-            # Cria o embed
             embed = discord.Embed(
                 title=mensagem_tickets,
-                color=discord.Color.orange(),  # Escolha uma cor para o embed
+                color=discord.Color.orange(),
             )
-            if tickets_abertos:
-                for row in tickets_abertos:
-                    analyst, ticket_count = row.analyst, row.ticket_count
-                    emoji = analyst_emojis.get(analyst, "")
-                    embed.add_field(
-                        name=f"{emoji} {analyst}",
-                        value=f"> {ticket_count} tickets em aberto.",
-                        inline=False,
-                    )
-            else:
+
+            # Consolida dados de tickets_abertos e tickets_matriz em um único dicionário
+            tickets_por_analista = {}
+
+            for row in tickets_abertos:
+                analyst = row.analyst
+                tickets_por_analista[analyst] = {
+                    "tickets_cliente": row.ticket_count,
+                    "tickets_matriz": 0, 
+                }
+
+            for row in tickets_matriz:
+                analyst = row.businessName
+                if analyst in tickets_por_analista:
+                    tickets_por_analista[analyst]["tickets_matriz"] = row.ticket_count
+                else:
+                    tickets_por_analista[analyst] = {
+                        "tickets_cliente": 0, 
+                        "tickets_matriz": row.ticket_count,
+                    }
+
+            for analyst, data in tickets_por_analista.items():
+                emoji = analyst_emojis.get(analyst, "")
+                tickets_cliente = data["tickets_cliente"]
+                tickets_matriz = data["tickets_matriz"]
+
+                value_lines = []
+                if tickets_cliente > 0:
+                    value_lines.append(f"> {tickets_cliente} tickets em aberto com o cliente.")
+                if tickets_matriz > 0:
+                    value_lines.append(f"> {tickets_matriz} tickets em aberto com a matriz.")
+
                 embed.add_field(
-                    name="🔔 Nenhum ticket em aberto!",
-                    value="Não há demandas em aberto no momento.",
+                    name=f"{emoji} {analyst}",
+                    value="\n".join(value_lines),
                     inline=False,
                 )
 
-            # Adiciona um rodapé opcional
             embed.set_footer(text="Última atualização de tickets em aberto.")
 
-            # Enviar embed no canal onde o comando foi chamado
             await message.channel.send(embed=embed)
             print("Relatório de tickets em aberto enviado com sucesso!")
 
 
 async def env_relat_todos(user_ids: list[int]):
     try:
+        current_date = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
         # Consulta para tickets não avaliados ou com notas baixas
         query_tickets = text(
             """
@@ -756,7 +770,8 @@ async def env_relat_todos(user_ids: list[int]):
             """
         )
 
-        result_tickets = session.execute(query_tickets, {"current_date": current_date})
+        result_tickets = session.execute(
+            query_tickets, {"current_date": current_date})
         rows_tickets = result_tickets.fetchall()
 
         mensagem_tickets = "Relatório de tickets não avaliados ou com notas baixas:\n"
@@ -781,7 +796,8 @@ async def env_relat_todos(user_ids: list[int]):
             """
         )
 
-        result_changes = session.execute(query_changes, {"current_date": current_date})
+        result_changes = session.execute(
+            query_changes, {"current_date": current_date})
         rows_changes = result_changes.fetchall()
 
         mensagem_changes = "\nRelatório de mudanças de notas de tickets no dia:\n"
@@ -822,6 +838,8 @@ async def env_relat_todos(user_ids: list[int]):
 
 async def enviar_notas_negativ(user_ids: list[int]):
     try:
+        current_date = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
+        print(f'*-*-{current_date}-*-*')
         query = text(
             """
             SELECT ticket_id, value
@@ -846,7 +864,9 @@ async def enviar_notas_negativ(user_ids: list[int]):
                 if user:
                     for row in rows:
                         ticket_id, value = row.ticket_id, row.value
-                        mensagem = f"Olá! O ticket {ticket_id} recebeu uma avaliação de {value}. Por favor, verifique o motivo."
+                        ticket_url = f"https://vrsoftware.movidesk.com/Ticket/Edit/{ticket_id}"
+
+                        mensagem = f"Olá! O [ticket {ticket_id}]({ticket_url}) recebeu uma avaliação de {value}. Por favor, verifique o motivo."
                         await user.send(mensagem)
                         print(
                             f"Mensagem enviada para o usuário {user.name} sobre o ticket {ticket_id} com nota {value}."
@@ -902,7 +922,8 @@ async def check_email():
 
                         subject, encoding = decode_header(msg["Subject"])[0]
                         if isinstance(subject, bytes):
-                            subject = subject.decode(encoding if encoding else "utf-8")
+                            subject = subject.decode(
+                                encoding if encoding else "utf-8")
 
                         from_ = msg.get("From")
                         from_decoded = decode_header(from_)
@@ -914,7 +935,10 @@ async def check_email():
                             else:
                                 from_ += part
 
-                        subject_skit = ["Re:", "RES:", "Sped Contribuições"]
+                        subject_skit = ["Re:",
+                                        "RES:",
+                                        "Sped Contribuições"
+                                        ]
 
                         if subject.startswith("Re:") or subject.startswith("RES:"):
                             continue
@@ -934,7 +958,8 @@ async def check_email():
                             f"📥 Novo e-mail na área! 📨 Remetente: ",
                         ]
 
-                        mensagem_escolhida = random.choice(mensagens_aleatorias)
+                        mensagem_escolhida = random.choice(
+                            mensagens_aleatorias)
                         print(f"Notificação de e-mail: {mensagem_escolhida}")
 
                         embed = discord.Embed(
@@ -944,9 +969,11 @@ async def check_email():
                             color=discord.Color.green(),  # Cor verde para notificação de e-mail
                         )
 
-                        embed.add_field(name="**Assunto**", value=subject, inline=False)
+                        embed.add_field(name="**Assunto**",
+                                        value=subject, inline=False)
 
-                        embed.add_field(name="**Remetente**", value=from_, inline=False)
+                        embed.add_field(name="**Remetente**",
+                                        value=from_, inline=False)
 
                         embed.set_footer(
                             text="Verifique sua caixa de entrada para mais detalhes."
