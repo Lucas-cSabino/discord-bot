@@ -739,8 +739,8 @@ async def on_message(message):
                 )
                 
                 for row in results:
-                    ticket_url = f"https://vrsoftware.movidesk.com/Ticket/Edit/{ticket_id}"
                     ticket_id, status, responsible = row.ticket_id, row.status, row.responsible
+                    ticket_url = f"https://vrsoftware.movidesk.com/Ticket/Edit/{ticket_id}"
                     embed.add_field(
                         name=f"[Ticket {ticket_id}]({ticket_url})",
                         value=f"Status: {status}",
