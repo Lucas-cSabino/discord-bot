@@ -176,7 +176,7 @@ def get_analyst_performance_embed(analyst_name=None):
     """
     Função para calcular o desempenho dos analistas e retornar um embed formatado.
     :params analsyt_name: recebe o nome do analista (para $desempenho individual)
-                          ou None (para $progresso geral).
+                        ou None (para $progresso geral).
     """
     try:
         # Subconsulta para filtrar tickets
@@ -187,10 +187,10 @@ def get_analyst_performance_embed(analyst_name=None):
                 FROM tickets_data
                 WHERE DATE("createdDate" AT TIME ZONE 'UTC') = :current_date
                 ORDER BY ticket_id, 
-                         CASE 
-                             WHEN type = 'resolvido' THEN 1 
-                             ELSE 2 
-                         END
+                        CASE 
+                            WHEN type = 'resolvido' THEN 1 
+                            ELSE 2 
+                        END
             )
         """
 
@@ -490,7 +490,7 @@ async def enviar_bom_dia_e_lembrete_tickets():
         """
         SELECT analyst, COUNT(ticket_id) AS ticket_count
         FROM tickets_data
-        WHERE status = 'Em atendimento'
+        WHERE status in ('Em atendimento', 'Aguardando resposta da Matriz')
         GROUP BY analyst;
     """
     )
@@ -690,6 +690,65 @@ async def on_message(message):
             # Aqui chamamos a função que retorna o progresso de todos os analistas
             performance_report_embed = get_analyst_performance_embed()
             await message.channel.send(embed=performance_report_embed)
+
+    elif message.content.startswith("$tickets"):
+        analyst_name = message.author.display_name
+        
+        async with message.channel.typing():
+            await asyncio.sleep(3)
+            
+            query = text(
+                """
+                SELECT 
+                    ticket_id, 
+                    status, 
+                    analyst AS responsible 
+                FROM tickets_data
+                WHERE analyst = :analyst_name 
+                AND status IN ('Em atendimento', 'Aguardando resposta da Matriz')
+                
+                UNION
+                
+                SELECT 
+                    ticket_id, 
+                    status, 
+                    "businessName" AS responsible 
+                FROM tickets_matriz
+                WHERE "businessName" = :analyst_name
+                AND status IN (
+                    'Em atendimento', 
+                    'Aguardando resposta da Matriz', 
+                    'Aguardando Retorno Cliente', 
+                    'AGUARDANDO PRODUTO', 
+                    'AGUARDANDO N2', 
+                    'EM ANALISE N2', 
+                    'Aguardando N2 - Fiscal', 
+                    'Em Analise - Produto'
+                )
+                """
+            )
+            
+            results = session.execute(query, {"analyst_name": analyst_name}).fetchall()
+            
+            if not results:
+                await message.channel.send(f"Olá {analyst_name}, você não possui Tickets em aberto 😊.")
+            else:
+                embed = discord.Embed(
+                    title=f"Tickets em andamento para {analyst_name}",
+                    color=discord.Color.blue(),
+                )
+                
+                for row in results:
+                    ticket_url = f"https://vrsoftware.movidesk.com/Ticket/Edit/{ticket_id}"
+                    ticket_id, status, responsible = row.ticket_id, row.status, row.responsible
+                    embed.add_field(
+                        name=f"[Ticket {ticket_id}]({ticket_url})",
+                        value=f"Status: {status}",
+                        inline=False,
+                    )
+                
+                # Envia o embed com os tickets
+                await message.channel.send(embed=embed)
 
 
     elif message.content.startswith("$demandas"):
