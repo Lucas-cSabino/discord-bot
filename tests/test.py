@@ -635,7 +635,7 @@ async def on_message(message):
 
         embed.add_field(
             name="```$desempenho```",
-            value="Exibe o desempenho do analista que usou o comando.",
+            value="Exibe o desempenho do analista solicitante.",
             inline=False,
         )
 
@@ -656,6 +656,15 @@ async def on_message(message):
         )
 
         embed.add_field(name="", value="", inline=False)
+
+        embed.add_field(
+            name="```$tickets```",
+            value="Mostra o ID dos tickets em aberto do analista solicitante.",
+            inline=False,
+        )
+
+        embed.add_field(name="", value="", inline=False)
+
 
         embed.add_field(
             name="```$menu```", value="Exibe esta lista de comandos.", inline=False
