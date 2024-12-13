@@ -616,6 +616,14 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
+    if message.webhook_id == 1316494230310617139:
+        for embed in message.embeds:
+            embed_data = embed.to_dict()
+            title = embed_data.get("title", "Sem titulo")
+            
+            if title == "Banco de Dados Travado":
+                print('asdhaodhasodhoiasdasdihasiodhasoidhaiosdioasdhoiashdio')
+
     if message.content.startswith("$menu"):
         # Cria o embed com título, descrição e cor
         embed = discord.Embed(
