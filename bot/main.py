@@ -6,6 +6,7 @@ import discord
 import datetime
 import imaplib
 import email
+import re
 
 from email.header import decode_header
 from typing import Final, Dict
@@ -376,6 +377,7 @@ async def on_ready():
     await register_commands()  # Registre comandos quando o bot estiver pronto
     alterar_status.start()  # Inicie a tarefa de alteração de status
     asyncio.create_task(check_email())
+    asyncio.create_task(check_backup())
 
 
 @bot.event
@@ -985,6 +987,89 @@ async def enviar_notas_negativ(user_ids: list[int]):
     except SQLAlchemyError as e:
         session.rollback()
         print(f"Erro ao acessar o banco de dados: {e}")
+
+
+async def check_backup():
+    while True:
+        try:
+            now = datetime.datetime.now()
+
+            # Configura os intervalos de envio
+            if now.hour == 12 and now.minute == 0:
+                start_time = datetime.datetime.combine(now.date(), datetime.time.min)
+                end_time = datetime.datetime.combine(now.date(), datetime.time(12, 0))
+                interval_desc = "até 12:00"
+            elif now.hour == 18 and now.minute == 0:
+                start_time = datetime.datetime.combine(now.date(), datetime.time(12, 1))
+                end_time = datetime.datetime.combine(now.date(), datetime.time(18, 0))
+                interval_desc = "entre 12:01 e 18:00"
+            else:
+                await asyncio.sleep(60)
+                continue
+
+            print(f"Verificando backups enviados {interval_desc}...")
+
+            # Conecta ao servidor IMAP
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+            mail.login(EMAIL, PASSWORD)
+            mail.select("inbox")
+
+            # Busca e-mails do remetente desde o início do dia
+            date_str = now.strftime('%d-%b-%Y')
+            status, messages = mail.search(None, f'(FROM "lucas.sabino@vrbelem.com.br" SENTSINCE {date_str})')
+            mail_ids = messages[0].split()
+
+            filtered_emails = {}
+            for mail_id in mail_ids:
+                status, msg_data = mail.fetch(mail_id, "(RFC822)")
+                for response_part in msg_data:
+                    if isinstance(response_part, tuple):
+                        msg = email.message_from_bytes(response_part[1])
+
+                        # Obtém a data e hora do e-mail
+                        email_date = parsedate_to_datetime(msg["Date"])
+                        if not (start_time <= email_date <= end_time):
+                            continue
+
+                        # Obtém o assunto do e-mail
+                        subject, encoding = decode_header(msg["Subject"])[0]
+                        if isinstance(subject, bytes):
+                            subject = subject.decode(encoding if encoding else "utf-8")
+
+                        # Extração do status e perfil
+                        match = re.search(r'Perfil: (.*?) \| Status: (.+)', subject)
+                        if match:
+                            perfil, status = match.groups()
+                            if status not in filtered_emails:
+                                filtered_emails[status] = []
+                            filtered_emails[status].append(perfil)
+
+            # Envia uma embed para cada status
+            user = await bot.fetch_user(717003940218273833)
+            if filtered_emails and user:
+                for status, perfis in filtered_emails.items():
+                    embed = discord.Embed(
+                        title=f"Status: {status}",
+                        description="\n".join(f"- {perfil}" for perfil in perfis),
+                        color=discord.Color.blue(),
+                    )
+                    embed.set_footer(text=f"Intervalo: {interval_desc}")
+
+                    try:
+                        await user.send(content=f"Lista de backups {interval_desc}:", embed=embed)
+                        print(f"Embed enviada para o status: {status}")
+                    except Exception as e:
+                        print(f"Erro ao enviar embed para o status {status}: {e}")
+            else:
+                print("Nenhum e-mail encontrado para o intervalo ou usuário inválido.")
+
+            mail.logout()
+        except Exception as e:
+            print(f"Erro ao verificar backups: {e}")
+
+        # Aguarda 60 segundos antes de verificar novamente
+        await asyncio.sleep(60)
+
 
 
 async def check_email():
